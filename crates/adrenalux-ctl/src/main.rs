@@ -39,6 +39,15 @@ pub enum Commands {
     },
     /// Launch real-time live terminal monitor
     Monitor,
+    /// Manage or query in-game Control Center overlay (Alt+A)
+    Overlay {
+        #[arg(long)]
+        toggle: bool,
+        #[arg(long)]
+        open: bool,
+        #[arg(long)]
+        close: bool,
+    },
 }
 
 struct Client {
@@ -265,6 +274,26 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 sleep(Duration::from_millis(200));
             }
         }
+
+        Commands::Overlay { toggle, open, close } => {
+            let req = if toggle {
+                Request::ToggleOverlay
+            } else if open {
+                Request::SetOverlayOpen(true)
+            } else if close {
+                Request::SetOverlayOpen(false)
+            } else {
+                Request::GetChillState
+            };
+
+            if let Ok(Response::Chill(c)) = client.call(req) {
+                println!(
+                    "In-Game Control Center Overlay: {}",
+                    if c.is_overlay_open { "OPEN" } else { "CLOSED" }
+                );
+                println!("Trigger hotkey: Alt+A");
+            }
+        }
     }
 
     Ok(())
@@ -318,5 +347,19 @@ mod tests {
         let args = vec!["adrenalux-ctl", "replay", "--seconds", "30"];
         let cli = Cli::try_parse_from(args).expect("Failed to parse replay command");
         assert_eq!(cli.command, Commands::Replay { seconds: 30 });
+    }
+
+    #[test]
+    fn test_cli_parsing_overlay() {
+        let args = vec!["adrenalux-ctl", "overlay", "--toggle"];
+        let cli = Cli::try_parse_from(args).expect("Failed to parse overlay command");
+        assert_eq!(
+            cli.command,
+            Commands::Overlay {
+                toggle: true,
+                open: false,
+                close: false
+            }
+        );
     }
 }

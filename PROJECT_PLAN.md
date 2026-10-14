@@ -160,19 +160,20 @@ gantt
 ### Month 1: Architecture Foundation & Core IPC
 - [x] Initialize Cargo workspace layout (`adrenalux-core`, `adrenalux-daemon`, `adrenalux-ctl`, `adrenalux-layer`).
 - [x] Design typed binary IPC protocol over UNIX domain sockets (`bincode` + `serde`).
-- [x] Build minimal Vulkan Implicit Layer intercepting loader negotiation, `vkCreateDevice`, and `vkQueuePresentKHR`.
+- [x] Build minimal Vulkan Implicit Layer intercepting loader negotiation, `vkCreateDevice`, `vkCreateSwapchainKHR`, and `vkQueuePresentKHR`.
 - [x] Implement monotonic precision frame pacer (`clock_nanosleep`) in `adrenalux-layer`.
 - [x] Build `adrenaluxd` background daemon with auto-detection of AMD GPUs and sysfs metrics.
-- [x] Build `adrenalux-ctl` CLI client (`status`, `telemetry`, `chill`, `replay`, `monitor`).
-- [x] Implement automated test suite (19 unit, component, and integration tests passing).
-- [ ] Integrate in-game HUD rendering pass inside `vkQueuePresentKHR`.
-- [ ] Implement global hotkey toggle (`Alt+R` / `Alt+Z`) for overlay focus.
+- [x] Build `adrenalux-ctl` CLI client (`status`, `telemetry`, `chill`, `replay`, `monitor`, `overlay`).
+- [x] Implement automated test suite (22 unit, component, and integration tests passing).
+- [x] Integrate in-game HUD rendering pass inside `vkQueuePresentKHR` using Dear ImGui and custom Vulkan RenderPass (preserving game frame with `VK_ATTACHMENT_LOAD_OP_LOAD`).
+- [x] Implement global hotkey toggle (`Alt+A`) via evdev monitoring in daemon and IPC sync to layer.
 
 ### Month 2: Open Chill (Input-Aware Frame Limiting) & Pacing Tests
 - [x] Initial `libevdev` input tracking daemon and idle delta calculation.
 - [x] Dynamic hysteresis state machine (active FPS vs throttled idle FPS).
 - [x] In-game & benchmark validation with `vkcube` and `vkmark` on live Radeon RX 9070 XT.
 - [x] Absolute monotonic frame pacing (`TIMER_ABSTIME`) verified at 30 FPS, 60 FPS, and uncapped.
+- [x] In-Game Control Center modal with AMD Crimson theme, real-time Telemetry, Chill status, Replay DVR, and Upscaler tabs.
 - [ ] Advanced input velocity monitoring (mouse delta velocity for Open Boost).
 - [ ] Automated pacing jitter test suite (benchmarking frametime variance at 30/60/144 FPS).
 - [ ] Power consumption benchmarking on AMD RDNA 4 (RX 9070 XT) across menus vs active gameplay.
@@ -261,8 +262,13 @@ Testing is built directly into every crate in the AdrenaLux workspace to ensure 
 
 ## 8. Current Status & Next Steps
 
-* **Current Status:** Phase 1 Foundation complete. 100% Rust workspace compiling in release mode with 11 automated unit and integration tests passing.
+* **Current Status:**
+  * **Vulkan Layer (`adrenalux-layer`):** Complete swapchain interception (`vkCreateSwapchainKHR`, `vkDestroySwapchainKHR`, `vkQueuePresentKHR`), Dear ImGui visual HUD with AMD Crimson red palette, minimal status bar, and interactive Control Center modal.
+  * **Global Hotkey:** `Alt+A` evdev hardware monitoring integrated in `adrenaluxd` and synchronized via IPC to the layer.
+  * **Frame Pacer:** Precision monotonic `clock_nanosleep(TIMER_ABSTIME)` dynamic frame pacing verified live on AMD Radeon RX 9070 XT.
+  * **Tests:** 22 automated unit, component, and integration tests passing (`cargo test --workspace`). Zero warnings on Clippy (`-D warnings`).
+  * **Hardware Validation:** Verified on live RX 9070 XT with `vkcube` and `vkmark`. Registered in system Vulkan layers and Steam Flatpak layer directory.
 * **Next Active Sprint:**
-  1. Vulkan Swapchain HUD rendering pass inside `crates/adrenalux-layer`.
-  2. In-game `Alt+R` hotkey activation.
-  3. OptiScaler Proton prefix scanner.
+  1. Automated OptiScaler Proton prefix scanner & `WINEDLLOVERRIDES` injector for Steam/Proton games.
+  2. Live `gpu-screen-recorder` managed replay session automation with in-overlay toast notifications.
+  3. Per-game profile persistence (storing custom Chill limits and fan curves per Steam AppId).

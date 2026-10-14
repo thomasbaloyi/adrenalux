@@ -10,6 +10,8 @@ pub enum Request {
     GetChillState,
     SetChillConfig(ChillConfig),
     TriggerReplay { buffer_seconds: u32 },
+    ToggleOverlay,
+    SetOverlayOpen(bool),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -63,6 +65,7 @@ pub struct ChillState {
     pub is_throttled: bool,
     pub current_target_fps: u32,
     pub last_input_delta_ms: u64,
+    pub is_overlay_open: bool,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
@@ -122,6 +125,7 @@ mod tests {
                 is_throttled: true,
                 current_target_fps: 30,
                 last_input_delta_ms: 3500,
+                is_overlay_open: true,
             }),
             Response::Replay(ReplayResult {
                 success: true,

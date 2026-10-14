@@ -7,9 +7,15 @@
 
 mod client;
 mod pacer;
+pub mod renderer;
 
 use client::LayerIpcClient;
 use pacer::FramePacer;
+use renderer::{
+    adrenalux_hud_on_create_swapchain, adrenalux_hud_on_destroy_swapchain,
+    adrenalux_hud_render_and_present, AdrenaluxChillInfo, AdrenaluxSwapchainInfo,
+    AdrenaluxTelemetry, VkSwapchainCreateInfoKHR,
+};
 use std::collections::HashMap;
 use std::ffi::{c_char, c_void, CStr};
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -20,6 +26,8 @@ type VkInstance = *mut c_void;
 type VkPhysicalDevice = *mut c_void;
 type VkDevice = *mut c_void;
 type VkQueue = *mut c_void;
+type VkSwapchainKHR = *mut c_void;
+
 #[allow(non_camel_case_types)]
 type PFN_vkVoidFunction = unsafe extern "system" fn();
 
@@ -95,15 +103,32 @@ union VkLayerDeviceCreateInfoUnion {
 }
 
 struct InstanceDispatch {
+    instance: VkInstance,
     gipa: unsafe extern "system" fn(VkInstance, *const c_char) -> PFN_vkVoidFunction,
     destroy_instance: Option<unsafe extern "system" fn(VkInstance, *const c_void)>,
 }
 
 #[derive(Clone)]
 struct DeviceDispatch {
+    #[allow(dead_code)]
+    device: VkDevice,
+    physical_device: VkPhysicalDevice,
+    instance: VkInstance,
+    queue: VkQueue,
+    queue_family: u32,
     gdpa: unsafe extern "system" fn(VkDevice, *const c_char) -> PFN_vkVoidFunction,
     destroy_device: Option<unsafe extern "system" fn(VkDevice, *const c_void)>,
     get_device_queue: Option<unsafe extern "system" fn(VkDevice, u32, u32, *mut VkQueue)>,
+    create_swapchain_khr: Option<
+        unsafe extern "system" fn(
+            VkDevice,
+            *const VkSwapchainCreateInfoKHR,
+            *const c_void,
+            *mut VkSwapchainKHR,
+        ) -> VkResult,
+    >,
+    destroy_swapchain_khr:
+        Option<unsafe extern "system" fn(VkDevice, VkSwapchainKHR, *const c_void)>,
     queue_present_khr: Option<unsafe extern "system" fn(VkQueue, *const c_void) -> VkResult>,
 }
 
@@ -113,6 +138,10 @@ struct LayerState {
     ipc: LayerIpcClient,
     pacer: FramePacer,
 }
+
+unsafe impl Send for InstanceDispatch {}
+unsafe impl Send for DeviceDispatch {}
+unsafe impl Send for LayerState {}
 
 static STATE: Mutex<Option<LayerState>> = Mutex::new(None);
 
@@ -176,15 +205,46 @@ pub unsafe extern "system" fn adrenalux_QueuePresentKHR(
     queue: VkQueue,
     present_info: *const c_void,
 ) -> VkResult {
-    let (target_fps, present_fn) = with_state(|state| {
+    let (target_fps, fps, telemetry, chill, present_fn) = with_state(|state| {
         let chill = state.ipc.get_chill_state();
+        let telemetry = state.ipc.get_telemetry();
+        let fps = state.pacer.get_fps();
         let key = get_dispatch_key(queue);
         let present_fn = state
             .device_dispatch
             .get(&key)
             .or_else(|| state.device_dispatch.values().next())
             .and_then(|d| d.queue_present_khr);
-        (chill.current_target_fps, present_fn)
+
+        let c_telemetry = AdrenaluxTelemetry {
+            gpu_temp_edge_c: telemetry.gpu_temp_edge_c,
+            gpu_temp_junction_c: telemetry.gpu_temp_junction_c,
+            gpu_temp_mem_c: telemetry.gpu_temp_mem_c,
+            core_clock_mhz: telemetry.core_clock_mhz,
+            mem_clock_mhz: telemetry.mem_clock_mhz,
+            power_draw_w: telemetry.power_draw_w,
+            power_cap_w: telemetry.power_cap_w,
+            fan_rpm: telemetry.fan_rpm,
+            fan_pwm: telemetry.fan_pwm,
+            vram_used_mb: telemetry.vram_used_mb,
+            vram_total_mb: telemetry.vram_total_mb,
+        };
+
+        let c_chill = AdrenaluxChillInfo {
+            enabled: chill.enabled,
+            is_throttled: chill.is_throttled,
+            current_target_fps: chill.current_target_fps,
+            last_input_delta_ms: chill.last_input_delta_ms,
+            is_overlay_open: chill.is_overlay_open,
+        };
+
+        (
+            chill.current_target_fps,
+            fps,
+            c_telemetry,
+            c_chill,
+            present_fn,
+        )
     });
 
     if !LOGGED_FIRST_FRAME.swap(true, Ordering::Relaxed) {
@@ -203,9 +263,86 @@ pub unsafe extern "system" fn adrenalux_QueuePresentKHR(
     });
 
     if let Some(f) = present_fn {
-        f(queue, present_info)
+        adrenalux_hud_render_and_present(queue, present_info, fps, &telemetry, &chill, f)
     } else {
         VK_SUCCESS
+    }
+}
+
+// Intercept: CreateSwapchainKHR
+#[no_mangle]
+pub unsafe extern "system" fn adrenalux_CreateSwapchainKHR(
+    device: VkDevice,
+    p_create_info: *const VkSwapchainCreateInfoKHR,
+    p_allocator: *const c_void,
+    p_swapchain: *mut VkSwapchainKHR,
+) -> VkResult {
+    let key = get_dispatch_key(device);
+    let (create_fn, dispatch_opt) = with_state(|state| {
+        let d = state.device_dispatch.get(&key).cloned();
+        (d.as_ref().and_then(|x| x.create_swapchain_khr), d)
+    });
+
+    let res = if let Some(f) = create_fn {
+        f(device, p_create_info, p_allocator, p_swapchain)
+    } else {
+        VK_SUCCESS
+    };
+
+    if res == VK_SUCCESS && !p_swapchain.is_null() && !p_create_info.is_null() {
+        if let Some(dispatch) = dispatch_opt {
+            let info = *p_create_info;
+            let gipa_fn = with_state(|s| {
+                s.instance_dispatch
+                    .get(&get_dispatch_key(dispatch.instance))
+                    .map(|i| i.gipa)
+            });
+
+            let swapchain_info = AdrenaluxSwapchainInfo {
+                device,
+                physical_device: dispatch.physical_device,
+                instance: dispatch.instance,
+                queue: dispatch.queue,
+                queue_family: dispatch.queue_family,
+                swapchain: *p_swapchain,
+                width: info.image_extent.width,
+                height: info.image_extent.height,
+                format: info.image_format,
+                min_image_count: info.min_image_count,
+                gdpa: Some(dispatch.gdpa),
+                gipa: gipa_fn,
+            };
+
+            let ok = adrenalux_hud_on_create_swapchain(&swapchain_info);
+            eprintln!(
+                "[AdrenaLux Layer] Created swapchain {}x{} (format: {}) -> HUD initialized: {}",
+                info.image_extent.width, info.image_extent.height, info.image_format, ok
+            );
+        }
+    }
+
+    res
+}
+
+// Intercept: DestroySwapchainKHR
+#[no_mangle]
+pub unsafe extern "system" fn adrenalux_DestroySwapchainKHR(
+    device: VkDevice,
+    swapchain: VkSwapchainKHR,
+    p_allocator: *const c_void,
+) {
+    adrenalux_hud_on_destroy_swapchain(swapchain);
+
+    let key = get_dispatch_key(device);
+    let destroy_fn = with_state(|state| {
+        state
+            .device_dispatch
+            .get(&key)
+            .and_then(|d| d.destroy_swapchain_khr)
+    });
+
+    if let Some(f) = destroy_fn {
+        f(device, swapchain, p_allocator);
     }
 }
 
@@ -230,7 +367,10 @@ pub unsafe extern "system" fn adrenalux_GetDeviceQueue(
         if !p_queue.is_null() && !(*p_queue).is_null() {
             let queue_key = get_dispatch_key(*p_queue);
             with_state(|state| {
-                if let Some(dispatch) = state.device_dispatch.get(&key).cloned() {
+                if let Some(mut dispatch) = state.device_dispatch.get(&key).cloned() {
+                    dispatch.queue = *p_queue;
+                    dispatch.queue_family = queue_family_index;
+                    state.device_dispatch.insert(key, dispatch.clone());
                     state.device_dispatch.insert(queue_key, dispatch);
                 }
             });
@@ -277,15 +417,33 @@ pub unsafe extern "system" fn adrenalux_CreateDevice(
     let destroy_name = CStr::from_bytes_with_nul(b"vkDestroyDevice\0").unwrap();
     let get_queue_name = CStr::from_bytes_with_nul(b"vkGetDeviceQueue\0").unwrap();
     let present_name = CStr::from_bytes_with_nul(b"vkQueuePresentKHR\0").unwrap();
+    let create_sc_name = CStr::from_bytes_with_nul(b"vkCreateSwapchainKHR\0").unwrap();
+    let destroy_sc_name = CStr::from_bytes_with_nul(b"vkDestroySwapchainKHR\0").unwrap();
 
     let destroy_fn = next_gdpa(*device, destroy_name.as_ptr());
     let get_queue_fn = next_gdpa(*device, get_queue_name.as_ptr());
     let present_fn = next_gdpa(*device, present_name.as_ptr());
+    let create_sc_fn = next_gdpa(*device, create_sc_name.as_ptr());
+    let destroy_sc_fn = next_gdpa(*device, destroy_sc_name.as_ptr());
+
+    let instance = with_state(|state| {
+        state
+            .instance_dispatch
+            .values()
+            .next()
+            .map(|i| i.instance)
+            .unwrap_or(std::ptr::null_mut())
+    });
 
     with_state(|state| {
         state.device_dispatch.insert(
             key,
             DeviceDispatch {
+                device: *device,
+                physical_device,
+                instance,
+                queue: std::ptr::null_mut(),
+                queue_family: 0,
                 gdpa: next_gdpa,
                 destroy_device: if destroy_fn as usize != 0 {
                     Some(std::mem::transmute(destroy_fn))
@@ -294,6 +452,16 @@ pub unsafe extern "system" fn adrenalux_CreateDevice(
                 },
                 get_device_queue: if get_queue_fn as usize != 0 {
                     Some(std::mem::transmute(get_queue_fn))
+                } else {
+                    None
+                },
+                create_swapchain_khr: if create_sc_fn as usize != 0 {
+                    Some(std::mem::transmute(create_sc_fn))
+                } else {
+                    None
+                },
+                destroy_swapchain_khr: if destroy_sc_fn as usize != 0 {
+                    Some(std::mem::transmute(destroy_sc_fn))
                 } else {
                     None
                 },
@@ -365,6 +533,7 @@ pub unsafe extern "system" fn adrenalux_CreateInstance(
         state.instance_dispatch.insert(
             key,
             InstanceDispatch {
+                instance: *instance,
                 gipa: next_gipa,
                 destroy_instance: if destroy_fn as usize != 0 {
                     Some(std::mem::transmute(destroy_fn))
@@ -409,6 +578,8 @@ pub unsafe extern "system" fn adrenalux_GetDeviceProcAddr(
         b"vkDestroyDevice" => std::mem::transmute(adrenalux_DestroyDevice as *const ()),
         b"vkGetDeviceQueue" => std::mem::transmute(adrenalux_GetDeviceQueue as *const ()),
         b"vkQueuePresentKHR" => std::mem::transmute(adrenalux_QueuePresentKHR as *const ()),
+        b"vkCreateSwapchainKHR" => std::mem::transmute(adrenalux_CreateSwapchainKHR as *const ()),
+        b"vkDestroySwapchainKHR" => std::mem::transmute(adrenalux_DestroySwapchainKHR as *const ()),
         _ => {
             let key = get_dispatch_key(device);
             let gdpa = with_state(|state| state.device_dispatch.get(&key).map(|d| d.gdpa));
@@ -437,6 +608,8 @@ pub unsafe extern "system" fn adrenalux_GetInstanceProcAddr(
         b"vkDestroyDevice" => std::mem::transmute(adrenalux_DestroyDevice as *const ()),
         b"vkGetDeviceQueue" => std::mem::transmute(adrenalux_GetDeviceQueue as *const ()),
         b"vkQueuePresentKHR" => std::mem::transmute(adrenalux_QueuePresentKHR as *const ()),
+        b"vkCreateSwapchainKHR" => std::mem::transmute(adrenalux_CreateSwapchainKHR as *const ()),
+        b"vkDestroySwapchainKHR" => std::mem::transmute(adrenalux_DestroySwapchainKHR as *const ()),
         _ => {
             let key = get_dispatch_key(instance);
             let gipa = with_state(|state| state.instance_dispatch.get(&key).map(|d| d.gipa));
@@ -544,12 +717,25 @@ mod tests {
                 fn_ptr4 as usize,
                 adrenalux_QueuePresentKHR as *const () as usize
             );
+
+            let name_create_sc = CStr::from_bytes_with_nul(b"vkCreateSwapchainKHR\0").unwrap();
+            let fn_ptr5 = adrenalux_GetInstanceProcAddr(null_inst, name_create_sc.as_ptr());
+            assert_eq!(
+                fn_ptr5 as usize,
+                adrenalux_CreateSwapchainKHR as *const () as usize
+            );
+
+            let name_destroy_sc = CStr::from_bytes_with_nul(b"vkDestroySwapchainKHR\0").unwrap();
+            let fn_ptr6 = adrenalux_GetInstanceProcAddr(null_inst, name_destroy_sc.as_ptr());
+            assert_eq!(
+                fn_ptr6 as usize,
+                adrenalux_DestroySwapchainKHR as *const () as usize
+            );
         }
     }
 
     #[test]
     fn test_pnext_chain_parser() {
-        // Construct mock VkInstanceCreateInfo with pNext pointing to a dummy struct then VkLayerInstanceCreateInfo
         #[repr(C)]
         struct DummyStruct {
             s_type: u32,
@@ -572,12 +758,12 @@ mod tests {
         };
 
         let dummy = DummyStruct {
-            s_type: 9999, // Unrelated extension in chain
+            s_type: 9999,
             p_next: &layer_info as *const _ as *const c_void,
         };
 
         let create_info = DummyStruct {
-            s_type: 1, // VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO
+            s_type: 1,
             p_next: &dummy as *const _ as *const c_void,
         };
 

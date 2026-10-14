@@ -4,7 +4,7 @@
 [![Language: Rust](https://img.shields.io/badge/Language-Rust-orange.svg)](https://www.rust-lang.org/)
 [![Platform: Linux](https://img.shields.io/badge/Platform-Linux-green.svg)](https://kernel.org)
 [![Build Status](https://img.shields.io/badge/Build-Passing-brightgreen.svg)]()
-[![Tests: 19 Passed](https://img.shields.io/badge/Tests-19%20Passed-brightgreen.svg)]()
+[![Tests: 22 Passed](https://img.shields.io/badge/Tests-22%20Passed-brightgreen.svg)]()
 
 > **The free and open-source gaming overlay and performance suite for Linux** — bringing the best of AMD Adrenalin (Unified In-Game HUD, Open Chill dynamic frame pacing, Instant Replay DVR, Hardware Tuning, and OptiScaler DLSS-to-FSR profiles) to the Linux gaming ecosystem.
 
@@ -15,7 +15,7 @@
 On Windows, the AMD Adrenalin software suite provides a tightly integrated, all-in-one experience. On Linux, the graphics driver stack (Mesa / RADV / amdgpu) delivers exceptional compute performance, but the user experience is fragmented across disconnected CLI tools and standalone utilities.
 
 **AdrenaLux** is a 100% open-source, modular suite designed to unite these capabilities:
-1. **In-Game HUD & Overlay**: Zero-latency Vulkan implicit layer (`Alt+R` / `Alt+Z`) with hardware metrics, instant replay controls, and profile switching.
+1. **In-Game HUD & Overlay**: Zero-latency Vulkan implicit layer (`Alt+A`) with hardware metrics, instant replay controls, and profile switching.
 2. **Open Chill & Boost**: Input-aware dynamic framerate throttling and resolution scaling that slashes power consumption and heat during menus and AFK periods.
 3. **OptiScaler & Profile Automation**: Automated DLSS-to-FSR injection, configuration management, and per-game tuning for Steam and Proton titles.
 4. **Hardware & DVR Integration**: Seamless integration with `amdgpu` sysfs and `gpu-screen-recorder` for one-click instant replay clips and fan/power control.

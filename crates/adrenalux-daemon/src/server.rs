@@ -86,6 +86,14 @@ impl IpcServer {
                 Request::TriggerReplay { buffer_seconds } => {
                     Response::Replay(dv.trigger_replay(buffer_seconds))
                 }
+                Request::ToggleOverlay => {
+                    ch.toggle_overlay();
+                    Response::Chill(ch.get_state())
+                }
+                Request::SetOverlayOpen(open) => {
+                    ch.set_overlay_open(open);
+                    Response::Chill(ch.get_state())
+                }
             };
 
             let encoded = bincode::serialize(&resp)?;
