@@ -275,7 +275,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
         }
 
-        Commands::Overlay { toggle, open, close } => {
+        Commands::Overlay {
+            toggle,
+            open,
+            close,
+        } => {
             let req = if toggle {
                 Request::ToggleOverlay
             } else if open {
