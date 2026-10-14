@@ -1,0 +1,19 @@
+# Build & Binaries
+target/
+build/
+bin/
+*.o
+*.a
+*.so
+*.dylib
+*.exe
+
+# IDE & Editor
+.vscode/
+.idea/
+*.swp
+*~
+
+# Logs & Environment
+*.log
+.env
