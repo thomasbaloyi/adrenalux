@@ -43,7 +43,10 @@ impl LayerIpcClient {
             let req = Request::GetChillState;
             if let Ok(encoded) = bincode::serialize(&req) {
                 let len = (encoded.len() as u32).to_le_bytes();
-                if stream.write_all(&len).is_ok() && stream.write_all(&encoded).is_ok() && stream.flush().is_ok() {
+                if stream.write_all(&len).is_ok()
+                    && stream.write_all(&encoded).is_ok()
+                    && stream.flush().is_ok()
+                {
                     let mut len_buf = [0u8; 4];
                     if stream.read_exact(&mut len_buf).is_ok() {
                         let resp_len = u32::from_le_bytes(len_buf) as usize;

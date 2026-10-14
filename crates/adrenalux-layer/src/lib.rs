@@ -1,3 +1,10 @@
+#![allow(
+    clippy::missing_safety_doc,
+    clippy::missing_transmute_annotations,
+    clippy::manual_c_str_literals,
+    clippy::transmute_null_to_fn
+)]
+
 mod client;
 mod pacer;
 
@@ -37,15 +44,18 @@ pub struct VkNegotiateLayerInterface {
     pub s_type: u32,
     pub p_next: *mut c_void,
     pub loader_layer_interface_version: u32,
-    pub pfn_get_instance_proc_addr: unsafe extern "system" fn(VkInstance, *const c_char) -> PFN_vkVoidFunction,
-    pub pfn_get_device_proc_addr: unsafe extern "system" fn(VkDevice, *const c_char) -> PFN_vkVoidFunction,
+    pub pfn_get_instance_proc_addr:
+        unsafe extern "system" fn(VkInstance, *const c_char) -> PFN_vkVoidFunction,
+    pub pfn_get_device_proc_addr:
+        unsafe extern "system" fn(VkDevice, *const c_char) -> PFN_vkVoidFunction,
     pub pfn_get_physical_device_proc_addr: *mut c_void,
 }
 
 #[repr(C)]
 struct VkLayerInstanceLink {
     p_next: *mut VkLayerInstanceLink,
-    pfn_next_get_instance_proc_addr: unsafe extern "system" fn(VkInstance, *const c_char) -> PFN_vkVoidFunction,
+    pfn_next_get_instance_proc_addr:
+        unsafe extern "system" fn(VkInstance, *const c_char) -> PFN_vkVoidFunction,
     pfn_next_get_physical_device_proc_addr: *mut c_void,
 }
 
@@ -65,8 +75,10 @@ union VkLayerInstanceCreateInfoUnion {
 #[repr(C)]
 struct VkLayerDeviceLink {
     p_next: *mut VkLayerDeviceLink,
-    pfn_next_get_instance_proc_addr: unsafe extern "system" fn(VkInstance, *const c_char) -> PFN_vkVoidFunction,
-    pfn_next_get_device_proc_addr: unsafe extern "system" fn(VkDevice, *const c_char) -> PFN_vkVoidFunction,
+    pfn_next_get_instance_proc_addr:
+        unsafe extern "system" fn(VkInstance, *const c_char) -> PFN_vkVoidFunction,
+    pfn_next_get_device_proc_addr:
+        unsafe extern "system" fn(VkDevice, *const c_char) -> PFN_vkVoidFunction,
 }
 
 #[repr(C)]
@@ -125,11 +137,15 @@ unsafe fn get_dispatch_key(obj: *mut c_void) -> usize {
 }
 
 unsafe fn get_instance_chain_info(create_info: *const c_void) -> *mut VkLayerInstanceCreateInfo {
-    if create_info.is_null() { return std::ptr::null_mut(); }
+    if create_info.is_null() {
+        return std::ptr::null_mut();
+    }
     let mut header = (*(create_info as *const VkGenericHeader)).p_next;
     while !header.is_null() {
         let h = header as *const VkLayerInstanceCreateInfo;
-        if (*h).s_type == VK_STRUCTURE_TYPE_LOADER_INSTANCE_CREATE_INFO && (*h).function == VK_LAYER_LINK_INFO {
+        if (*h).s_type == VK_STRUCTURE_TYPE_LOADER_INSTANCE_CREATE_INFO
+            && (*h).function == VK_LAYER_LINK_INFO
+        {
             return header as *mut VkLayerInstanceCreateInfo;
         }
         header = (*(header as *const VkGenericHeader)).p_next;
@@ -138,11 +154,15 @@ unsafe fn get_instance_chain_info(create_info: *const c_void) -> *mut VkLayerIns
 }
 
 unsafe fn get_device_chain_info(create_info: *const c_void) -> *mut VkLayerDeviceCreateInfo {
-    if create_info.is_null() { return std::ptr::null_mut(); }
+    if create_info.is_null() {
+        return std::ptr::null_mut();
+    }
     let mut header = (*(create_info as *const VkGenericHeader)).p_next;
     while !header.is_null() {
         let h = header as *const VkLayerDeviceCreateInfo;
-        if (*h).s_type == VK_STRUCTURE_TYPE_LOADER_DEVICE_CREATE_INFO && (*h).function == VK_LAYER_LINK_INFO {
+        if (*h).s_type == VK_STRUCTURE_TYPE_LOADER_DEVICE_CREATE_INFO
+            && (*h).function == VK_LAYER_LINK_INFO
+        {
             return header as *mut VkLayerDeviceCreateInfo;
         }
         header = (*(header as *const VkGenericHeader)).p_next;
@@ -170,7 +190,11 @@ pub unsafe extern "system" fn adrenalux_QueuePresentKHR(
     if !LOGGED_FIRST_FRAME.swap(true, Ordering::Relaxed) {
         eprintln!(
             "[AdrenaLux Layer] Intercepted active game swapchain! Open Chill Target FPS: {}",
-            if target_fps == 0 { "Uncapped".to_string() } else { target_fps.to_string() }
+            if target_fps == 0 {
+                "Uncapped".to_string()
+            } else {
+                target_fps.to_string()
+            }
         );
     }
 
@@ -195,7 +219,10 @@ pub unsafe extern "system" fn adrenalux_GetDeviceQueue(
 ) {
     let key = get_dispatch_key(device);
     let get_queue_fn = with_state(|state| {
-        state.device_dispatch.get(&key).and_then(|d| d.get_device_queue)
+        state
+            .device_dispatch
+            .get(&key)
+            .and_then(|d| d.get_device_queue)
     });
 
     if let Some(f) = get_queue_fn {
@@ -287,7 +314,10 @@ pub unsafe extern "system" fn adrenalux_CreateDevice(
 pub unsafe extern "system" fn adrenalux_DestroyDevice(device: VkDevice, allocator: *const c_void) {
     let key = get_dispatch_key(device);
     let destroy_fn = with_state(|state| {
-        state.device_dispatch.remove(&key).and_then(|d| d.destroy_device)
+        state
+            .device_dispatch
+            .remove(&key)
+            .and_then(|d| d.destroy_device)
     });
 
     if let Some(f) = destroy_fn {
@@ -350,10 +380,16 @@ pub unsafe extern "system" fn adrenalux_CreateInstance(
 
 // Intercept: DestroyInstance
 #[no_mangle]
-pub unsafe extern "system" fn adrenalux_DestroyInstance(instance: VkInstance, allocator: *const c_void) {
+pub unsafe extern "system" fn adrenalux_DestroyInstance(
+    instance: VkInstance,
+    allocator: *const c_void,
+) {
     let key = get_dispatch_key(instance);
     let destroy_fn = with_state(|state| {
-        state.instance_dispatch.remove(&key).and_then(|d| d.destroy_instance)
+        state
+            .instance_dispatch
+            .remove(&key)
+            .and_then(|d| d.destroy_instance)
     });
 
     if let Some(f) = destroy_fn {
@@ -375,9 +411,7 @@ pub unsafe extern "system" fn adrenalux_GetDeviceProcAddr(
         b"vkQueuePresentKHR" => std::mem::transmute(adrenalux_QueuePresentKHR as *const ()),
         _ => {
             let key = get_dispatch_key(device);
-            let gdpa = with_state(|state| {
-                state.device_dispatch.get(&key).map(|d| d.gdpa)
-            });
+            let gdpa = with_state(|state| state.device_dispatch.get(&key).map(|d| d.gdpa));
             if let Some(f) = gdpa {
                 f(device, name)
             } else {
@@ -405,9 +439,7 @@ pub unsafe extern "system" fn adrenalux_GetInstanceProcAddr(
         b"vkQueuePresentKHR" => std::mem::transmute(adrenalux_QueuePresentKHR as *const ()),
         _ => {
             let key = get_dispatch_key(instance);
-            let gipa = with_state(|state| {
-                state.instance_dispatch.get(&key).map(|d| d.gipa)
-            });
+            let gipa = with_state(|state| state.instance_dispatch.get(&key).map(|d| d.gipa));
             if let Some(f) = gipa {
                 f(instance, name)
             } else {
@@ -437,4 +469,126 @@ pub unsafe extern "system" fn adrenalux_NegotiateLoaderLayerInterfaceVersion(
     }
 
     VK_SUCCESS
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_negotiate_valid_version() {
+        let mut iface = VkNegotiateLayerInterface {
+            s_type: LAYER_NEGOTIATE_INTERFACE_STRUCT,
+            p_next: std::ptr::null_mut(),
+            loader_layer_interface_version: 2,
+            pfn_get_instance_proc_addr: unsafe { std::mem::transmute(std::ptr::null::<()>()) },
+            pfn_get_device_proc_addr: unsafe { std::mem::transmute(std::ptr::null::<()>()) },
+            pfn_get_physical_device_proc_addr: std::ptr::null_mut(),
+        };
+
+        let res = unsafe { adrenalux_NegotiateLoaderLayerInterfaceVersion(&mut iface) };
+        assert_eq!(res, VK_SUCCESS);
+        assert_eq!(
+            iface.pfn_get_instance_proc_addr as usize,
+            adrenalux_GetInstanceProcAddr as *const () as usize
+        );
+        assert_eq!(
+            iface.pfn_get_device_proc_addr as usize,
+            adrenalux_GetDeviceProcAddr as *const () as usize
+        );
+    }
+
+    #[test]
+    fn test_negotiate_invalid_struct() {
+        let mut iface = VkNegotiateLayerInterface {
+            s_type: 999, // Invalid
+            p_next: std::ptr::null_mut(),
+            loader_layer_interface_version: 2,
+            pfn_get_instance_proc_addr: unsafe { std::mem::transmute(std::ptr::null::<()>()) },
+            pfn_get_device_proc_addr: unsafe { std::mem::transmute(std::ptr::null::<()>()) },
+            pfn_get_physical_device_proc_addr: std::ptr::null_mut(),
+        };
+
+        let res = unsafe { adrenalux_NegotiateLoaderLayerInterfaceVersion(&mut iface) };
+        assert_eq!(res, VK_ERROR_INITIALIZATION_FAILED);
+    }
+
+    #[test]
+    fn test_proc_addr_resolution() {
+        unsafe {
+            let null_inst: VkInstance = std::ptr::null_mut();
+            let name_gpa = CStr::from_bytes_with_nul(b"vkGetInstanceProcAddr\0").unwrap();
+            let fn_ptr = adrenalux_GetInstanceProcAddr(null_inst, name_gpa.as_ptr());
+            assert_eq!(
+                fn_ptr as usize,
+                adrenalux_GetInstanceProcAddr as *const () as usize
+            );
+
+            let name_ci = CStr::from_bytes_with_nul(b"vkCreateInstance\0").unwrap();
+            let fn_ptr2 = adrenalux_GetInstanceProcAddr(null_inst, name_ci.as_ptr());
+            assert_eq!(
+                fn_ptr2 as usize,
+                adrenalux_CreateInstance as *const () as usize
+            );
+
+            let name_cd = CStr::from_bytes_with_nul(b"vkCreateDevice\0").unwrap();
+            let fn_ptr3 = adrenalux_GetInstanceProcAddr(null_inst, name_cd.as_ptr());
+            assert_eq!(
+                fn_ptr3 as usize,
+                adrenalux_CreateDevice as *const () as usize
+            );
+
+            let name_present = CStr::from_bytes_with_nul(b"vkQueuePresentKHR\0").unwrap();
+            let fn_ptr4 = adrenalux_GetInstanceProcAddr(null_inst, name_present.as_ptr());
+            assert_eq!(
+                fn_ptr4 as usize,
+                adrenalux_QueuePresentKHR as *const () as usize
+            );
+        }
+    }
+
+    #[test]
+    fn test_pnext_chain_parser() {
+        // Construct mock VkInstanceCreateInfo with pNext pointing to a dummy struct then VkLayerInstanceCreateInfo
+        #[repr(C)]
+        struct DummyStruct {
+            s_type: u32,
+            p_next: *const c_void,
+        }
+
+        let mut layer_link = VkLayerInstanceLink {
+            p_next: std::ptr::null_mut(),
+            pfn_next_get_instance_proc_addr: unsafe { std::mem::transmute(std::ptr::null::<()>()) },
+            pfn_next_get_physical_device_proc_addr: std::ptr::null_mut(),
+        };
+
+        let layer_info = VkLayerInstanceCreateInfo {
+            s_type: VK_STRUCTURE_TYPE_LOADER_INSTANCE_CREATE_INFO,
+            p_next: std::ptr::null(),
+            function: VK_LAYER_LINK_INFO,
+            u: VkLayerInstanceCreateInfoUnion {
+                p_layer_info: &mut layer_link,
+            },
+        };
+
+        let dummy = DummyStruct {
+            s_type: 9999, // Unrelated extension in chain
+            p_next: &layer_info as *const _ as *const c_void,
+        };
+
+        let create_info = DummyStruct {
+            s_type: 1, // VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO
+            p_next: &dummy as *const _ as *const c_void,
+        };
+
+        unsafe {
+            let found = get_instance_chain_info(&create_info as *const _ as *const c_void);
+            assert!(!found.is_null());
+            assert_eq!(
+                (*found).s_type,
+                VK_STRUCTURE_TYPE_LOADER_INSTANCE_CREATE_INFO
+            );
+            assert_eq!((*found).function, VK_LAYER_LINK_INFO);
+        }
+    }
 }

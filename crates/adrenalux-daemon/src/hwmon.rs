@@ -76,17 +76,23 @@ impl HardwareMonitor {
 
         if let Some(hwmon) = &self.hwmon_path {
             // Temps in milli-Celsius -> convert to Celsius
-            data.gpu_temp_edge_c = (self.read_sysfs_i64(&hwmon.join("temp1_input")) as f32) / 1000.0;
-            data.gpu_temp_junction_c = (self.read_sysfs_i64(&hwmon.join("temp2_input")) as f32) / 1000.0;
+            data.gpu_temp_edge_c =
+                (self.read_sysfs_i64(&hwmon.join("temp1_input")) as f32) / 1000.0;
+            data.gpu_temp_junction_c =
+                (self.read_sysfs_i64(&hwmon.join("temp2_input")) as f32) / 1000.0;
             data.gpu_temp_mem_c = (self.read_sysfs_i64(&hwmon.join("temp3_input")) as f32) / 1000.0;
 
             // Clocks in Hz -> convert to MHz
-            data.core_clock_mhz = (self.read_sysfs_i64(&hwmon.join("freq1_input")) / 1_000_000) as u32;
-            data.mem_clock_mhz = (self.read_sysfs_i64(&hwmon.join("freq2_input")) / 1_000_000) as u32;
+            data.core_clock_mhz =
+                (self.read_sysfs_i64(&hwmon.join("freq1_input")) / 1_000_000) as u32;
+            data.mem_clock_mhz =
+                (self.read_sysfs_i64(&hwmon.join("freq2_input")) / 1_000_000) as u32;
 
             // Power in micro-watts -> convert to Watts
-            data.power_draw_w = (self.read_sysfs_i64(&hwmon.join("power1_average")) as f32) / 1_000_000.0;
-            data.power_cap_w = (self.read_sysfs_i64(&hwmon.join("power1_cap")) as f32) / 1_000_000.0;
+            data.power_draw_w =
+                (self.read_sysfs_i64(&hwmon.join("power1_average")) as f32) / 1_000_000.0;
+            data.power_cap_w =
+                (self.read_sysfs_i64(&hwmon.join("power1_cap")) as f32) / 1_000_000.0;
 
             // Fan
             data.fan_rpm = self.read_sysfs_i64(&hwmon.join("fan1_input")) as u32;
@@ -104,13 +110,20 @@ impl HardwareMonitor {
     }
 }
 
+impl Default for HardwareMonitor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
     fn test_telemetry_parsing_with_mock_sysfs() {
-        let temp_dir = std::env::temp_dir().join(format!("adrenalux_test_hwmon_{}", std::process::id()));
+        let temp_dir =
+            std::env::temp_dir().join(format!("adrenalux_test_hwmon_{}", std::process::id()));
         let card_dir = temp_dir.join("card");
         let hwmon_dir = card_dir.join("hwmon").join("hwmon0");
 
@@ -150,7 +163,8 @@ mod tests {
 
     #[test]
     fn test_missing_files_graceful_fallback() {
-        let temp_dir = std::env::temp_dir().join(format!("adrenalux_empty_hwmon_{}", std::process::id()));
+        let temp_dir =
+            std::env::temp_dir().join(format!("adrenalux_empty_hwmon_{}", std::process::id()));
         let card_dir = temp_dir.join("card");
         let hwmon_dir = card_dir.join("hwmon");
         fs::create_dir_all(&hwmon_dir).unwrap();

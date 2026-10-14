@@ -109,6 +109,12 @@ impl ChillEngine {
     }
 }
 
+impl Default for ChillEngine {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

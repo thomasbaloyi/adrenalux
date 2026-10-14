@@ -164,7 +164,7 @@ gantt
 - [x] Implement monotonic precision frame pacer (`clock_nanosleep`) in `adrenalux-layer`.
 - [x] Build `adrenaluxd` background daemon with auto-detection of AMD GPUs and sysfs metrics.
 - [x] Build `adrenalux-ctl` CLI client (`status`, `telemetry`, `chill`, `replay`, `monitor`).
-- [x] Implement automated test suite (11 unit and integration tests passing).
+- [x] Implement automated test suite (19 unit, component, and integration tests passing).
 - [ ] Integrate in-game HUD rendering pass inside `vkQueuePresentKHR`.
 - [ ] Implement global hotkey toggle (`Alt+R` / `Alt+Z`) for overlay focus.
 

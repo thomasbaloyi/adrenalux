@@ -94,7 +94,8 @@ mod tests {
 
         for req in requests {
             let encoded = bincode::serialize(&req).expect("Failed to serialize request");
-            let decoded: Request = bincode::deserialize(&encoded).expect("Failed to deserialize request");
+            let decoded: Request =
+                bincode::deserialize(&encoded).expect("Failed to deserialize request");
             assert_eq!(req, decoded);
         }
     }
@@ -132,7 +133,8 @@ mod tests {
 
         for resp in responses {
             let encoded = bincode::serialize(&resp).expect("Failed to serialize response");
-            let decoded: Response = bincode::deserialize(&encoded).expect("Failed to deserialize response");
+            let decoded: Response =
+                bincode::deserialize(&encoded).expect("Failed to deserialize response");
             assert_eq!(resp, decoded);
         }
     }

@@ -18,6 +18,9 @@ mod tests {
     #[test]
     fn test_socket_path_not_empty() {
         let path = get_socket_path();
-        assert!(path.to_string_lossy().contains(DEFAULT_SOCKET_NAME) || path.to_string_lossy().contains("adrenalux"));
+        assert!(
+            path.to_string_lossy().contains(DEFAULT_SOCKET_NAME)
+                || path.to_string_lossy().contains("adrenalux")
+        );
     }
 }

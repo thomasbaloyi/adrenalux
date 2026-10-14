@@ -1,11 +1,14 @@
 use std::time::Instant;
 
 fn get_monotonic_ns() -> i64 {
-    let mut ts = libc::timespec { tv_sec: 0, tv_nsec: 0 };
+    let mut ts = libc::timespec {
+        tv_sec: 0,
+        tv_nsec: 0,
+    };
     unsafe {
         libc::clock_gettime(libc::CLOCK_MONOTONIC, &mut ts);
     }
-    (ts.tv_sec as i64) * 1_000_000_000 + (ts.tv_nsec as i64)
+    (ts.tv_sec) * 1_000_000_000 + (ts.tv_nsec)
 }
 
 pub struct FramePacer {
@@ -31,7 +34,9 @@ impl FramePacer {
         if target_fps > 0 {
             let target_interval_ns = 1_000_000_000i64 / (target_fps as i64);
 
-            if self.next_frame_target_ns == 0 || now_ns > self.next_frame_target_ns + target_interval_ns * 2 {
+            if self.next_frame_target_ns == 0
+                || now_ns > self.next_frame_target_ns + target_interval_ns * 2
+            {
                 self.next_frame_target_ns = now_ns + target_interval_ns;
             } else {
                 self.next_frame_target_ns += target_interval_ns;
@@ -43,7 +48,13 @@ impl FramePacer {
                     tv_nsec: (self.next_frame_target_ns % 1_000_000_000) as libc::c_long,
                 };
                 unsafe {
-                    while libc::clock_nanosleep(libc::CLOCK_MONOTONIC, libc::TIMER_ABSTIME, &req, std::ptr::null_mut()) == libc::EINTR {}
+                    while libc::clock_nanosleep(
+                        libc::CLOCK_MONOTONIC,
+                        libc::TIMER_ABSTIME,
+                        &req,
+                        std::ptr::null_mut(),
+                    ) == libc::EINTR
+                    {}
                 }
             }
         } else {
@@ -54,7 +65,8 @@ impl FramePacer {
         let now = Instant::now();
         let period_elapsed = now.duration_since(self.fps_period_start);
         if period_elapsed.as_millis() >= 500 {
-            self.current_fps = (self.frames_in_period as f32 * 1000.0) / (period_elapsed.as_millis() as f32);
+            self.current_fps =
+                (self.frames_in_period as f32 * 1000.0) / (period_elapsed.as_millis() as f32);
             self.frames_in_period = 0;
             self.fps_period_start = now;
         }

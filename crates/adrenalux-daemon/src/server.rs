@@ -28,7 +28,10 @@ impl IpcServer {
         }
 
         let listener = UnixListener::bind(&sock_path)?;
-        println!("[IpcServer] Listening on UNIX domain socket: {:?}", sock_path);
+        println!(
+            "[IpcServer] Listening on UNIX domain socket: {:?}",
+            sock_path
+        );
 
         loop {
             match listener.accept().await {

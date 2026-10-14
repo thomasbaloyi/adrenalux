@@ -21,6 +21,12 @@ impl DvrController {
         Self { replay_dir }
     }
 
+    #[cfg(test)]
+    pub fn with_dir(replay_dir: PathBuf) -> Self {
+        let _ = fs::create_dir_all(&replay_dir);
+        Self { replay_dir }
+    }
+
     fn find_gsr_pid(&self) -> Option<i32> {
         let proc = Path::new("/proc");
         if let Ok(entries) = fs::read_dir(proc) {
@@ -30,7 +36,9 @@ impl DvrController {
                     let comm_file = entry.path().join("comm");
                     if let Ok(comm) = fs::read_to_string(comm_file) {
                         let comm_trimmed = comm.trim();
-                        if comm_trimmed == "gpu-screen-reco" || comm_trimmed == "gpu-screen-recorder" {
+                        if comm_trimmed == "gpu-screen-reco"
+                            || comm_trimmed == "gpu-screen-recorder"
+                        {
                             return Some(pid);
                         }
                     }
@@ -62,5 +70,32 @@ impl DvrController {
                 message: "gpu-screen-recorder replay buffer is not currently active".into(),
             }
         }
+    }
+}
+
+impl Default for DvrController {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_dvr_directory_creation() {
+        let temp_dir =
+            std::env::temp_dir().join(format!("adrenalux_test_dvr_{}", std::process::id()));
+        let ctrl = DvrController::with_dir(temp_dir.clone());
+        assert!(temp_dir.exists());
+
+        // When GSR is not running, trigger_replay must return a graceful error rather than panicking
+        let res = ctrl.trigger_replay(60);
+        assert!(!res.success);
+        assert!(res.message.contains("gpu-screen-recorder"));
+        assert_eq!(res.saved_path, temp_dir.to_string_lossy().to_string());
+
+        let _ = fs::remove_dir_all(temp_dir);
     }
 }

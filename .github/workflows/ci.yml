@@ -1,0 +1,38 @@
+name: AdrenaLux CI
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  test:
+    name: Test Suite & Regression Checks
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Install system dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y libvulkan-dev libevdev-dev
+
+    - name: Set up Rust toolchain
+      uses: dtolnay/rust-toolchain@stable
+      with:
+        components: clippy, rustfmt
+
+    - name: Check code formatting
+      run: cargo fmt --all -- --check
+
+    - name: Run clippy linter
+      run: cargo clippy --all-targets --all-features -- -D warnings
+
+    - name: Run all Unit, Component, and Integration Tests
+      run: cargo test --workspace --all-features --verbose

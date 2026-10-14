@@ -9,7 +9,8 @@ use tokio::net::{UnixListener, UnixStream};
 
 #[tokio::test]
 async fn test_ipc_server_roundtrip() {
-    let test_sock_path = std::env::temp_dir().join(format!("adrenalux_test_ipc_{}.sock", std::process::id()));
+    let test_sock_path =
+        std::env::temp_dir().join(format!("adrenalux_test_ipc_{}.sock", std::process::id()));
     if test_sock_path.exists() {
         let _ = std::fs::remove_file(&test_sock_path);
     }
@@ -34,8 +35,12 @@ async fn test_ipc_server_roundtrip() {
                     break;
                 }
                 let len = u32::from_le_bytes(len_buf) as usize;
-                if len > buf.len() { buf.resize(len, 0); }
-                if stream.read_exact(&mut buf[..len]).await.is_err() { break; }
+                if len > buf.len() {
+                    buf.resize(len, 0);
+                }
+                if stream.read_exact(&mut buf[..len]).await.is_err() {
+                    break;
+                }
 
                 let req: Request = bincode::deserialize(&buf[..len]).unwrap();
                 let resp = match req {
@@ -46,7 +51,9 @@ async fn test_ipc_server_roundtrip() {
                         ch.update_config(cfg);
                         Response::Chill(ch.get_state())
                     }
-                    Request::TriggerReplay { buffer_seconds } => Response::Replay(dv.trigger_replay(buffer_seconds)),
+                    Request::TriggerReplay { buffer_seconds } => {
+                        Response::Replay(dv.trigger_replay(buffer_seconds))
+                    }
                 };
 
                 let encoded = bincode::serialize(&resp).unwrap();
@@ -62,12 +69,17 @@ async fn test_ipc_server_roundtrip() {
     tokio::time::sleep(Duration::from_millis(50)).await;
 
     // Connect client
-    let mut client = UnixStream::connect(&test_sock_path).await.expect("Failed to connect client");
+    let mut client = UnixStream::connect(&test_sock_path)
+        .await
+        .expect("Failed to connect client");
 
     // 1. Test Ping
     let ping_req = Request::Ping;
     let enc = bincode::serialize(&ping_req).unwrap();
-    client.write_all(&(enc.len() as u32).to_le_bytes()).await.unwrap();
+    client
+        .write_all(&(enc.len() as u32).to_le_bytes())
+        .await
+        .unwrap();
     client.write_all(&enc).await.unwrap();
     client.flush().await.unwrap();
 
@@ -88,7 +100,10 @@ async fn test_ipc_server_roundtrip() {
         boost_enabled: false,
     });
     let enc = bincode::serialize(&set_cfg).unwrap();
-    client.write_all(&(enc.len() as u32).to_le_bytes()).await.unwrap();
+    client
+        .write_all(&(enc.len() as u32).to_le_bytes())
+        .await
+        .unwrap();
     client.write_all(&enc).await.unwrap();
     client.flush().await.unwrap();
 

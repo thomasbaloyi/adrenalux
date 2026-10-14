@@ -4,7 +4,7 @@
 [![Language: Rust](https://img.shields.io/badge/Language-Rust-orange.svg)](https://www.rust-lang.org/)
 [![Platform: Linux](https://img.shields.io/badge/Platform-Linux-green.svg)](https://kernel.org)
 [![Build Status](https://img.shields.io/badge/Build-Passing-brightgreen.svg)]()
-[![Tests: 11 Passed](https://img.shields.io/badge/Tests-11%20Passed-brightgreen.svg)]()
+[![Tests: 19 Passed](https://img.shields.io/badge/Tests-19%20Passed-brightgreen.svg)]()
 
 > **The free and open-source gaming overlay and performance suite for Linux** — bringing the best of AMD Adrenalin (Unified In-Game HUD, Open Chill dynamic frame pacing, Instant Replay DVR, Hardware Tuning, and OptiScaler DLSS-to-FSR profiles) to the Linux gaming ecosystem.
 
