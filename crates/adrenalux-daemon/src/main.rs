@@ -1,12 +1,7 @@
-mod chill;
-mod dvr;
-mod hwmon;
-mod server;
-
-use chill::ChillEngine;
-use dvr::DvrController;
-use hwmon::HardwareMonitor;
-use server::IpcServer;
+use adrenaluxd::chill::ChillEngine;
+use adrenaluxd::dvr::DvrController;
+use adrenaluxd::hwmon::HardwareMonitor;
+use adrenaluxd::server::IpcServer;
 use std::sync::Arc;
 
 #[tokio::main]

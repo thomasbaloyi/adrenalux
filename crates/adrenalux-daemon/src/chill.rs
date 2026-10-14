@@ -108,3 +108,58 @@ impl ChillEngine {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_chill_state_transitions() {
+        let engine = ChillEngine::new();
+        engine.update_config(ChillConfig {
+            enabled: true,
+            idle_fps: 30,
+            active_fps: 144,
+            idle_timeout_ms: 100, // 100ms timeout for test speed
+            boost_enabled: false,
+        });
+
+        // Record input now -> should be active
+        engine.record_input();
+        let state1 = engine.get_state();
+        assert!(state1.enabled);
+        assert!(!state1.is_throttled);
+        assert_eq!(state1.current_target_fps, 144);
+
+        // Sleep 150ms -> should transition to throttled
+        std::thread::sleep(Duration::from_millis(150));
+        let state2 = engine.get_state();
+        assert!(state2.is_throttled);
+        assert_eq!(state2.current_target_fps, 30);
+        assert!(state2.last_input_delta_ms >= 100);
+
+        // Record input again -> should immediately wake up
+        engine.record_input();
+        let state3 = engine.get_state();
+        assert!(!state3.is_throttled);
+        assert_eq!(state3.current_target_fps, 144);
+    }
+
+    #[test]
+    fn test_chill_disabled_state() {
+        let engine = ChillEngine::new();
+        engine.update_config(ChillConfig {
+            enabled: false,
+            idle_fps: 30,
+            active_fps: 144,
+            idle_timeout_ms: 50,
+            boost_enabled: false,
+        });
+
+        std::thread::sleep(Duration::from_millis(100));
+        let state = engine.get_state();
+        assert!(!state.enabled);
+        assert!(!state.is_throttled);
+        assert_eq!(state.current_target_fps, 144);
+    }
+}

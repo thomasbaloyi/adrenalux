@@ -12,6 +12,7 @@ type VkInstance = *mut c_void;
 type VkPhysicalDevice = *mut c_void;
 type VkDevice = *mut c_void;
 type VkQueue = *mut c_void;
+#[allow(non_camel_case_types)]
 type PFN_vkVoidFunction = unsafe extern "system" fn();
 
 const VK_SUCCESS: VkResult = 0;

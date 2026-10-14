@@ -48,7 +48,36 @@ impl FramePacer {
         }
     }
 
+    #[allow(dead_code)]
     pub fn get_fps(&self) -> f32 {
         self.current_fps
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::time::Duration;
+
+    #[test]
+    fn test_pacer_initialization() {
+        let pacer = FramePacer::new();
+        assert_eq!(pacer.get_fps(), 0.0);
+    }
+
+    #[test]
+    fn test_pacer_pacing_rate() {
+        let mut pacer = FramePacer::new();
+        let target_fps = 60; // ~16.6ms per frame
+
+        let start = Instant::now();
+        // Pace 3 frames
+        for _ in 0..3 {
+            pacer.pace_frame(target_fps);
+        }
+        let elapsed = start.elapsed();
+
+        // 3 frames at 60 FPS should take at least ~30-50ms
+        assert!(elapsed >= Duration::from_millis(25));
     }
 }
