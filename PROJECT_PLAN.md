@@ -194,10 +194,10 @@ gantt
 
 | Component | Language / Framework | Justification |
 | :--- | :--- | :--- |
-| **Vulkan Layer** | C++ or Rust (`cdylib`) | Low overhead, zero runtime pause, direct Vulkan C ABI compatibility. |
-| **Core Daemon (`adrenaluxd`)** | Rust or Go | High reliability, clean concurrency for IPC, evdev monitoring, and sysfs I/O. |
-| **In-Game GUI** | Dear ImGui (Vulkan backend) | Industry standard for zero-latency game overlays; lightweight and dependency-free. |
-| **Input Monitoring** | `libevdev` | Native Linux kernel input interface; catches keyboard, mouse, and gamepad events. |
+| **Vulkan Layer** | Rust (`cdylib`) | Low overhead, zero runtime pause/GC, pure C ABI compatibility, memory safety. |
+| **Core Daemon (`adrenaluxd`)** | Rust (Tokio) | Concurrency safety without data races, fast async I/O, evdev monitoring, and sysfs. |
+| **Control CLI (`adrenalux-ctl`)** | Rust (Clap) | Fast, expressive CLI framework with zero runtime dependencies. |
+| **IPC Protocol** | Rust (`bincode` / `serde`) | Ultra-fast zero-copy binary serialization over UNIX domain sockets. |
 | **DVR Backend** | `gpu-screen-recorder` | Extremely fast, zero frame-drop hardware encoder using AMD VCN / VA-API. |
 | **Upscaling Integration** | OptiScaler (FSR 2/3.1 bridge) | De-facto standard for translating DLSS/XeSS calls to AMD FSR. |
 
