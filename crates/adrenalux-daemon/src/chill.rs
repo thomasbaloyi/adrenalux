@@ -4,7 +4,7 @@ use std::fs;
 use std::path::Path;
 use std::sync::atomic::{AtomicBool, AtomicI64, Ordering};
 use std::sync::{Arc, RwLock};
-use std::time::{Duration, Instant};
+use std::time::Instant;
 
 pub struct ChillEngine {
     config: Arc<RwLock<ChillConfig>>,
@@ -37,8 +37,21 @@ impl ChillEngine {
                     for entry in entries.flatten() {
                         let name = entry.file_name().to_string_lossy().to_string();
                         if name.starts_with("event") {
-                            if let Ok(dev) = Device::open(entry.path()) {
-                                devices.push(dev);
+                            let path = entry.path();
+                            if let Ok(dev) = Device::open(&path) {
+                                // Only monitor devices that support keys or mouse relative movement
+                                if dev.supported_events().contains(EventType::KEY)
+                                    || dev.supported_events().contains(EventType::RELATIVE)
+                                {
+                                    // Set non-blocking on the underlying file descriptor
+                                    unsafe {
+                                        use std::os::unix::io::AsRawFd;
+                                        let fd = dev.as_raw_fd();
+                                        let flags = libc::fcntl(fd, libc::F_GETFL);
+                                        libc::fcntl(fd, libc::F_SETFL, flags | libc::O_NONBLOCK);
+                                    }
+                                    devices.push(dev);
+                                }
                             }
                         }
                     }
@@ -59,25 +72,58 @@ impl ChillEngine {
             let mut alt_down = false;
 
             loop {
-                let mut activity = false;
-                for dev in &mut devices {
-                    if let Ok(events) = dev.fetch_events() {
-                        for ev in events {
-                            activity = true;
-                            if ev.event_type() == EventType::KEY {
-                                let key = Key::new(ev.code());
-                                let val = ev.value();
+                // Poll all device file descriptors with 25ms timeout so we don't spin or block
+                let mut poll_fds: Vec<libc::pollfd> = devices
+                    .iter()
+                    .map(|d| {
+                        use std::os::unix::io::AsRawFd;
+                        libc::pollfd {
+                            fd: d.as_raw_fd(),
+                            events: libc::POLLIN,
+                            revents: 0,
+                        }
+                    })
+                    .collect();
 
-                                if key == Key::KEY_LEFTALT || key == Key::KEY_RIGHTALT {
-                                    alt_down = val == 1 || val == 2;
-                                } else if key == Key::KEY_A && val == 1 && alt_down {
-                                    // Alt+A pressed! Toggle overlay!
-                                    let new_val = !overlay_open.load(Ordering::Relaxed);
-                                    overlay_open.store(new_val, Ordering::Relaxed);
-                                    println!(
-                                        "[ChillEngine] Global Hotkey Alt+A detected! Overlay is now: {}",
-                                        if new_val { "OPEN" } else { "CLOSED" }
-                                    );
+                let poll_ret = unsafe {
+                    libc::poll(poll_fds.as_mut_ptr(), poll_fds.len() as libc::nfds_t, 25)
+                };
+
+                let mut activity = false;
+
+                if poll_ret > 0 {
+                    for (i, pfd) in poll_fds.iter().enumerate() {
+                        if (pfd.revents & libc::POLLIN) != 0 {
+                            let dev = &mut devices[i];
+                            let event_list: Vec<_> = match dev.fetch_events() {
+                                Ok(evs) => evs.collect(),
+                                Err(_) => Vec::new(),
+                            };
+
+                            for ev in event_list {
+                                activity = true;
+                                if ev.event_type() == EventType::KEY {
+                                    let key = Key::new(ev.code());
+                                    let val = ev.value();
+
+                                    if key == Key::KEY_LEFTALT || key == Key::KEY_RIGHTALT {
+                                        alt_down = val == 1 || val == 2;
+                                    } else if key == Key::KEY_A && val == 1 {
+                                        let kernel_alt = dev.get_key_state().is_ok_and(|keys| {
+                                            keys.contains(Key::KEY_LEFTALT)
+                                                || keys.contains(Key::KEY_RIGHTALT)
+                                        });
+
+                                        if alt_down || kernel_alt {
+                                            // Alt+A pressed! Toggle overlay!
+                                            let new_val = !overlay_open.load(Ordering::Relaxed);
+                                            overlay_open.store(new_val, Ordering::Relaxed);
+                                            println!(
+                                                "[ChillEngine] Global Hotkey Alt+A detected! Overlay is now: {}",
+                                                if new_val { "OPEN" } else { "CLOSED" }
+                                            );
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -88,8 +134,6 @@ impl ChillEngine {
                     let now_ms = start.elapsed().as_millis() as i64;
                     last_input.store(now_ms, Ordering::Relaxed);
                 }
-
-                std::thread::sleep(Duration::from_millis(25));
             }
         });
     }
@@ -150,6 +194,7 @@ impl Default for ChillEngine {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::time::Duration;
 
     #[test]
     fn test_chill_state_transitions() {
