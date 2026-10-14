@@ -1,7 +1,7 @@
 use adrenalux_core::protocol::{ChillState, Request, Response};
 use std::io::{Read, Write};
 use std::os::unix::net::UnixStream;
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 pub struct LayerIpcClient {
     stream: Option<UnixStream>,
@@ -14,9 +14,14 @@ impl LayerIpcClient {
         let mut client = Self {
             stream: None,
             cached_chill: ChillState::default(),
-            last_query: Instant::now(),
+            // Set in the past so the first call queries immediately
+            last_query: Instant::now()
+                .checked_sub(Duration::from_secs(10))
+                .unwrap_or_else(Instant::now),
         };
         client.try_connect();
+        // Pre-fetch initial state
+        let _ = client.query_daemon();
         client
     }
 
@@ -24,20 +29,14 @@ impl LayerIpcClient {
         if self.stream.is_none() {
             let path = adrenalux_core::get_socket_path();
             if let Ok(s) = UnixStream::connect(path) {
-                let _ = s.set_nonblocking(false);
+                let _ = s.set_read_timeout(Some(Duration::from_millis(50)));
+                let _ = s.set_write_timeout(Some(Duration::from_millis(50)));
                 self.stream = Some(s);
             }
         }
     }
 
-    pub fn get_chill_state(&mut self) -> ChillState {
-        let now = Instant::now();
-        // Query at most once every 16ms
-        if now.duration_since(self.last_query).as_millis() < 16 {
-            return self.cached_chill.clone();
-        }
-        self.last_query = now;
-
+    fn query_daemon(&mut self) -> Option<ChillState> {
         self.try_connect();
 
         if let Some(stream) = &mut self.stream {
@@ -52,7 +51,7 @@ impl LayerIpcClient {
                         if stream.read_exact(&mut resp_buf).is_ok() {
                             if let Ok(Response::Chill(st)) = bincode::deserialize(&resp_buf) {
                                 self.cached_chill = st;
-                                return self.cached_chill.clone();
+                                return Some(self.cached_chill.clone());
                             }
                         }
                     }
@@ -60,8 +59,18 @@ impl LayerIpcClient {
             }
         }
 
-        // On failure, drop connection so we retry connecting later
         self.stream = None;
+        None
+    }
+
+    pub fn get_chill_state(&mut self) -> ChillState {
+        let now = Instant::now();
+        // Query daemon at most once every 16ms
+        if now.duration_since(self.last_query).as_millis() >= 16 {
+            self.last_query = now;
+            let _ = self.query_daemon();
+        }
+
         self.cached_chill.clone()
     }
 }

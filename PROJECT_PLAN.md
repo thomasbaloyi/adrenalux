@@ -171,9 +171,10 @@ gantt
 ### Month 2: Open Chill (Input-Aware Frame Limiting) & Pacing Tests
 - [x] Initial `libevdev` input tracking daemon and idle delta calculation.
 - [x] Dynamic hysteresis state machine (active FPS vs throttled idle FPS).
+- [x] In-game & benchmark validation with `vkcube` and `vkmark` on live Radeon RX 9070 XT.
+- [x] Absolute monotonic frame pacing (`TIMER_ABSTIME`) verified at 30 FPS, 60 FPS, and uncapped.
 - [ ] Advanced input velocity monitoring (mouse delta velocity for Open Boost).
 - [ ] Automated pacing jitter test suite (benchmarking frametime variance at 30/60/144 FPS).
-- [ ] In-game validation with `vkcube` and native Vulkan titles.
 - [ ] Power consumption benchmarking on AMD RDNA 4 (RX 9070 XT) across menus vs active gameplay.
 
 ### Month 3: Instant Replay DVR & AMD Hardware Controls
