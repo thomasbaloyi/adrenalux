@@ -1,0 +1,19 @@
+[package]
+name = "adrenaluxd"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "adrenaluxd"
+path = "src/main.rs"
+
+[dependencies]
+adrenalux-core.workspace = true
+serde.workspace = true
+bincode.workspace = true
+tokio.workspace = true
+evdev.workspace = true
+nix.workspace = true
+libc.workspace = true

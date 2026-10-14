@@ -3,10 +3,10 @@
     "layer": {
         "name": "VK_LAYER_ADRENALUX_overlay",
         "type": "GLOBAL",
-        "library_path": "@LAYER_LIBRARY_PATH@",
+        "library_path": "libadrenalux_layer.so",
         "api_version": "1.3.0",
         "implementation_version": "1",
-        "description": "AdrenaLux In-Game Overlay & Dynamic Frame Pacer Layer",
+        "description": "AdrenaLux In-Game Overlay & Dynamic Frame Pacer Layer (Rust)",
         "functions": {
             "vkNegotiateLoaderLayerInterfaceVersion": "adrenalux_NegotiateLoaderLayerInterfaceVersion"
         },

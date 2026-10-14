@@ -1,0 +1,17 @@
+[package]
+name = "adrenalux-ctl"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "adrenalux-ctl"
+path = "src/main.rs"
+
+[dependencies]
+adrenalux-core.workspace = true
+serde.workspace = true
+bincode.workspace = true
+clap.workspace = true
+libc.workspace = true

@@ -1,0 +1,16 @@
+[package]
+name = "adrenalux-layer"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[lib]
+name = "adrenalux_layer"
+crate-type = ["cdylib"]
+
+[dependencies]
+adrenalux-core.workspace = true
+serde.workspace = true
+bincode.workspace = true
+libc.workspace = true
